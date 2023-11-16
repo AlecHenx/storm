@@ -12,34 +12,23 @@
 
 package org.apache.storm.task;
 
-import com.codahale.metrics.Counter;
-import com.codahale.metrics.Gauge;
-import com.codahale.metrics.Histogram;
-import com.codahale.metrics.Meter;
-import com.codahale.metrics.MetricSet;
 import com.codahale.metrics.Timer;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
-import java.util.concurrent.atomic.AtomicBoolean;
+import com.codahale.metrics.*;
 import org.apache.storm.generated.GlobalStreamId;
 import org.apache.storm.generated.Grouping;
 import org.apache.storm.generated.StormTopology;
 import org.apache.storm.hooks.ITaskHook;
-import org.apache.storm.metric.api.CombinedMetric;
-import org.apache.storm.metric.api.ICombiner;
-import org.apache.storm.metric.api.IMetric;
-import org.apache.storm.metric.api.IReducer;
-import org.apache.storm.metric.api.ReducedMetric;
+import org.apache.storm.metric.api.*;
 import org.apache.storm.metrics2.StormMetricRegistry;
 import org.apache.storm.shade.net.minidev.json.JSONValue;
 import org.apache.storm.shade.org.apache.commons.lang.NotImplementedException;
 import org.apache.storm.state.ISubscribedState;
 import org.apache.storm.tuple.Fields;
+import org.apache.storm.utils.Graph;
 import org.apache.storm.utils.Utils;
+
+import java.util.*;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
  * A `TopologyContext` is given to bolts and spouts in their `prepare()` and `open()` methods, respectively. This object provides
@@ -58,6 +47,7 @@ public class TopologyContext extends WorkerTopologyContext implements IMetricsCo
     private final StormMetricRegistry metricRegistry;
     // This is updated by the Worker and the topology has shared access to it
     private final Map<String, Long> blobToLastKnownVersion;
+    private final Graph roadMap_;
 
     public TopologyContext(StormTopology topology,
                            Map<String, Object> topoConf,
@@ -78,14 +68,16 @@ public class TopologyContext extends WorkerTopologyContext implements IMetricsCo
                            AtomicBoolean openOrPrepareWasCalled,
                            StormMetricRegistry metricRegistry) {
         super(topology, topoConf, taskToComponent, componentToSortedTasks,
-              componentToStreamToFields, stormId, codeDir, pidDir,
-              workerPort, workerTasks, defaultResources, userResources);
+                componentToStreamToFields, stormId, codeDir, pidDir,
+                workerPort, workerTasks, defaultResources, userResources);
         this.metricRegistry = metricRegistry;
         this.taskId = taskId;
         this.executorData = executorData;
         this.registeredMetrics = registeredMetrics;
         this.openOrPrepareWasCalled = openOrPrepareWasCalled;
         blobToLastKnownVersion = blobToLastKnownVersionShared;
+        // TODO: load road map from file.
+        roadMap_ = null;
     }
 
     @SuppressWarnings("checkstyle:AbbreviationAsWordInName")
@@ -96,6 +88,10 @@ public class TopologyContext extends WorkerTopologyContext implements IMetricsCo
             groupingMap.put("fields", grouping.get_fields());
         }
         return groupingMap;
+    }
+
+    public Graph getRoadMap_() {
+        return roadMap_;
     }
 
     /**

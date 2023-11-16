@@ -317,9 +317,11 @@ public class RasNode implements Comparable<RasNode> {
         }
         LOG.debug("target slot: {}", target);
 
+        // 联动更新cluster中的数据
         cluster.assign(target, td.getId(), executors);
 
         //assigning internally
+        // Topo找到使用的worker，找到指定的worker，将对应的exec加入进去
         topIdToUsedSlots.computeIfAbsent(td.getId(), (tid) -> new HashMap<>())
             .computeIfAbsent(target.getId(), (tid) -> new LinkedList<>())
             .addAll(executors);
@@ -337,19 +339,23 @@ public class RasNode implements Comparable<RasNode> {
         }
         Collection<WorkerSlot> freeSlots = getFreeSlots();
         Set<ExecutorDetails> toAssign = new HashSet<>();
+        // 需要assign的所有executor
         toAssign.add(exec);
+        // 说明ws已经有部分exec存在了，不是一个完全free的worker
         if (!freeSlots.contains(ws)) {
             Map<String, Collection<ExecutorDetails>> usedSlots = topIdToUsedSlots.get(td.getId());
             if (usedSlots == null) {
                 throw new IllegalArgumentException(
                     "Slot " + ws + " is not availble to schedue " + exec + " on");
             }
+            // 把已经有的exec拿出来放到toAssign
             Collection<ExecutorDetails> alreadyHere = usedSlots.get(ws.getId());
             if (alreadyHere == null) {
                 throw new IllegalArgumentException(
                     "Slot " + ws + " is not availble to schedue " + exec + " on");
             }
             toAssign.addAll(alreadyHere);
+            // 让ws加入到free list中
             free(ws);
         }
         assign(ws, td, toAssign);

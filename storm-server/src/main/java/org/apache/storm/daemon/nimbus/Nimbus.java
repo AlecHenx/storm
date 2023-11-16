@@ -2079,6 +2079,7 @@ public class Nimbus implements Iface, Shutdownable, DaemonCommon {
                 List<Integer> tasks = entry.getValue();
                 tasks.sort(null);
                 Integer numExecutors = compToExecutors.get(compId);
+                // FIXME(hch): I think the numExecutors is equal to tasks.size()?
                 if (numExecutors != null) {
                     List<List<Integer>> partitioned = Utils.partitionFixed(numExecutors, tasks);
                     for (List<Integer> partition : partitioned) {

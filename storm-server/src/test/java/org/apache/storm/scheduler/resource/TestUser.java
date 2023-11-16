@@ -59,6 +59,7 @@ public class TestUser {
     @Test
     public void testResourcePoolUtilization() {
         for (Class strategyClass: strategyClasses) {
+            System.out.println("Just check out." + strategyClass.getName());
             INimbus iNimbus = new INimbusTest();
             Map<String, SupervisorDetails> supMap = genSupervisors(4, 4, 100, 1000);
             double cpuGuarantee = 400.0;

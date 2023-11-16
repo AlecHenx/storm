@@ -134,6 +134,7 @@ public class RoundRobinResourceAwareStrategy extends BaseResourceAwareStrategy {
                 nodeSortCnt++;
             }
 
+            // 逐个遍历节点
             while (sortedNodesIter.hasNext()) {
                 String nodeId = sortedNodesIter.next();
                 RasNode node = nodes.getNodeById(nodeId);

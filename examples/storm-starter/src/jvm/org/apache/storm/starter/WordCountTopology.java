@@ -14,6 +14,9 @@ package org.apache.storm.starter;
 
 import java.util.HashMap;
 import java.util.Map;
+
+import org.apache.storm.Config;
+import org.apache.storm.StormSubmitter;
 import org.apache.storm.starter.bolt.WordCountBolt;
 import org.apache.storm.starter.spout.RandomSentenceSpout;
 import org.apache.storm.task.ShellBolt;
@@ -26,42 +29,68 @@ import org.apache.storm.topology.base.BaseBasicBolt;
 import org.apache.storm.tuple.Fields;
 import org.apache.storm.tuple.Tuple;
 import org.apache.storm.tuple.Values;
+import org.apache.storm.LocalCluster;
 
 /**
  * This topology demonstrates Storm's stream groupings and multilang
  * capabilities.
  */
-public class WordCountTopology extends ConfigurableTopology {
+public class WordCountTopology {
+
     public static void main(String[] args) throws Exception {
-        ConfigurableTopology.start(new WordCountTopology(), args);
-    }
-
-    @Override
-    protected int run(String[] args) throws Exception {
-
         TopologyBuilder builder = new TopologyBuilder();
+        builder.setSpout("spout",new RandomSentenceSpout(), 5);
+        builder.setBolt("split",new SplitSentence(), 8).shuffleGrouping("spout");
+        builder.setBolt("count",new WordCountBolt(), 12).fieldsGrouping("split", new Fields("word"));
 
-        builder.setSpout("spout", new RandomSentenceSpout(), 5);
+        Config config = new Config();
+        config.setDebug(false);
 
-        builder.setBolt("split", new SplitSentence(), 8).shuffleGrouping("spout");
-        builder.setBolt("count", new WordCountBolt(), 12).fieldsGrouping("split", new Fields("word"));
+        LocalCluster localCluster = new LocalCluster();
+        localCluster.submitTopology("wordcount",config,builder.createTopology());
 
-        conf.setDebug(true);
-
-        String topologyName = "word-count";
-
-        conf.setNumWorkers(3);
-
-        if (args != null && args.length > 0) {
-            topologyName = args[0];
-        }
-        return submit(topologyName, conf, builder);
     }
-
+//
+//    public static void main(final String args[]) throws Exception {
+//        LocalCluster.withLocalModeOverride(() -> {
+//            originalMain(args);
+//            return (Void) null;
+//        }, 10);
+//    }
+//
+//    public static void originalMain(String[] args) throws Exception {
+//        ConfigurableTopology.start(new WordCountTopology(), args);
+//    }
+//
+//    @Override
+//    protected int run(String[] args) throws Exception {
+//
+//        TopologyBuilder builder = new TopologyBuilder();
+//
+//        builder.setSpout("spout", new RandomSentenceSpout(), 5);
+//
+//        builder.setBolt("split", new SplitSentence(), 8).shuffleGrouping("spout");
+//        builder.setBolt("count", new WordCountBolt(), 12).fieldsGrouping("split", new Fields("word"));
+//
+//        conf.setDebug(true);
+//
+//        String topologyName = "word-count";
+//
+//        conf.setNumWorkers(3);
+//
+//        if (args != null && args.length > 0) {
+//            topologyName = args[0];
+//        }
+//        LocalCluster localCluster = new LocalCluster();
+//        localCluster.submitTopology(topologyName,conf,builder.createTopology());
+//        return 0;
+////        return submit(topologyName, conf, builder);
+//    }
+//
     public static class SplitSentence extends ShellBolt implements IRichBolt {
 
         public SplitSentence() {
-            super("python3", "splitsentence.py");
+            super("/home/hch/anaconda3/envs/rlts/bin/python", "splitsentence.py");
         }
 
         @Override

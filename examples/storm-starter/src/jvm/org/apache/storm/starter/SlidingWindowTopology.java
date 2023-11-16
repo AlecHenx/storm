@@ -15,6 +15,7 @@ package org.apache.storm.starter;
 import java.util.List;
 import java.util.Map;
 import org.apache.storm.Config;
+import org.apache.storm.LocalCluster;
 import org.apache.storm.StormSubmitter;
 import org.apache.storm.starter.bolt.PrinterBolt;
 import org.apache.storm.starter.bolt.SlidingWindowSumBolt;
@@ -49,13 +50,18 @@ public class SlidingWindowTopology {
                .shuffleGrouping("slidingsum");
         builder.setBolt("printer", new PrinterBolt(), 1).shuffleGrouping("tumblingavg");
         Config conf = new Config();
-        conf.setDebug(true);
+        conf.setDebug(false);
         String topoName = "test";
         if (args != null && args.length > 0) {
             topoName = args[0];
         }
         conf.setNumWorkers(1);
-        StormSubmitter.submitTopologyWithProgressBar(topoName, conf, builder.createTopology());
+
+
+        LocalCluster localCluster = new LocalCluster();
+        localCluster.submitTopology(topoName,conf,builder.createTopology());
+
+//        StormSubmitter.submitTopologyWithProgressBar(topoName, conf, builder.createTopology());
     }
 
     /**

@@ -1165,7 +1165,7 @@ public class Cluster implements ISchedulingState {
     }
 
     /**
-     * Update the assignments and status from the other cluster.
+     * Update the assignments and status from the other cluster.我理解是会把other cluster merge到自己。
      *
      * @param other the cluster to get the assignments and status from
      */

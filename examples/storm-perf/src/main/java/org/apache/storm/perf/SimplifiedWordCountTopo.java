@@ -20,7 +20,11 @@ package org.apache.storm.perf;
 
 import java.util.Map;
 import org.apache.storm.Config;
+import org.apache.storm.LocalCluster;
+import org.apache.storm.StormSubmitter;
 import org.apache.storm.generated.StormTopology;
+import org.apache.storm.generated.SubmitOptions;
+import org.apache.storm.generated.TopologyInitialStatus;
 import org.apache.storm.perf.bolt.CountBolt;
 import org.apache.storm.perf.spout.WordGenSpout;
 import org.apache.storm.perf.utils.Helper;
@@ -57,7 +61,7 @@ public class SimplifiedWordCountTopo {
     }
 
     // Toplogy:  WorGenSpout -> FieldsGrouping -> CountBolt
-    public static void main(String[] args) throws Exception {
+    public static void originalMain(String[] args) throws Exception {
         int runTime = -1;
         Config topoConf = new Config();
         if (args.length > 2) {
@@ -78,7 +82,16 @@ public class SimplifiedWordCountTopo {
         topoConf.put(Config.TOPOLOGY_BOLT_WAIT_PARK_MICROSEC, 0);
 
         topoConf.putAll(Utils.readCommandLineOpts());
+        SubmitOptions opts = new SubmitOptions(TopologyInitialStatus.INACTIVE);
         //  Submit topology to storm cluster
-        Helper.runOnClusterAndPrintMetrics(runTime, TOPOLOGY_NAME, topoConf, getTopology(topoConf));
+        StormSubmitter.submitTopologyAs("test-simplified-word-topo", topoConf, getTopology(topoConf), opts, null, "none");
+//        Helper.runOnClusterAndPrintMetrics(runTime, TOPOLOGY_NAME, topoConf, getTopology(topoConf));
+    }
+
+    public static void main(final String args[]) throws Exception {
+        LocalCluster.withLocalModeOverride(() -> {
+            originalMain(args);
+            return (Void) null;
+        }, 10);
     }
 }

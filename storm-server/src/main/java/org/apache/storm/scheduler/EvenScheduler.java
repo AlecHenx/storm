@@ -130,6 +130,7 @@ public class EvenScheduler implements IScheduler {
         }
 
         List<ExecutorDetails> executors = new ArrayList<ExecutorDetails>(reassignExecutors);
+        // Note: first come, first served?
         Collections.sort(executors, new Comparator<ExecutorDetails>() {
             @Override
             public int compare(ExecutorDetails o1, ExecutorDetails o2) {
@@ -137,6 +138,7 @@ public class EvenScheduler implements IScheduler {
             }
         });
 
+        // Note: Round-Robin
         for (int i = 0; i < executors.size(); i++) {
             reassignment.put(executors.get(i), reassignSlots.get(i % reassignSlots.size()));
         }
