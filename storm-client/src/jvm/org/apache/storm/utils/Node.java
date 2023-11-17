@@ -4,54 +4,54 @@ import java.util.ArrayList;
 import java.util.List;
 
 public class Node {
-    public Node(int id, double x, double y) {
-        x_ = x;
-        y_ = y;
-        nodeId_ = id;
-        edgeNumbers_ = 0;
-        edges_ = new ArrayList<Integer>();
+    public Node(int id, double positionX, double positionY) {
+        this.positionX = positionX;
+        this.positionY = positionY;
+        nodeId = id;
+        edgeNumbers = 0;
+        edges = new ArrayList<Integer>();
     }
 
-    public double getX_() {
-        return x_;
+    public double getPositionX() {
+        return positionX;
     }
 
-    public void setX_(double x_) {
-        this.x_ = x_;
+    public void setPositionX(double positionX) {
+        this.positionX = positionX;
     }
 
-    public double getY_() {
-        return y_;
+    public double getPositionY() {
+        return positionY;
     }
 
-    public void setY_(double y_) {
-        this.y_ = y_;
+    public void setPositionY(double positionY) {
+        this.positionY = positionY;
     }
 
-    public double getEdgeNumbers_() {
-        return edgeNumbers_;
+    public double getEdgeNumbers() {
+        return edgeNumbers;
     }
 
-    public void setEdgeNumbers_(double edgeNumbers_) {
-        this.edgeNumbers_ = edgeNumbers_;
+    public void setEdgeNumbers(double edgeNumbers) {
+        this.edgeNumbers = edgeNumbers;
     }
 
     public void addEdge(int edgeId) {
-        edgeNumbers_++;
-        edges_.add(edgeId);
+        edgeNumbers++;
+        edges.add(edgeId);
     }
 
-    public int getNodeId_() {
-        return nodeId_;
+    public int getNodeId() {
+        return nodeId;
     }
 
-    public List<Integer> getEdges_() {
-        return edges_;
+    public List<Integer> getEdges() {
+        return edges;
     }
 
-    private int nodeId_;
-    private double x_;
-    private double y_;
-    private double edgeNumbers_;
-    private List<Integer> edges_;
+    private int nodeId;
+    private double positionX;
+    private double positionY;
+    private double edgeNumbers;
+    private List<Integer> edges;
 }

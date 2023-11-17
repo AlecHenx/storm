@@ -1,2 +1,4 @@
-package org.apache.storm.starter.bolt;public class BatchCompressBolt {
+package org.apache.storm.starter.bolt;
+
+public class BatchCompressBolt {
 }

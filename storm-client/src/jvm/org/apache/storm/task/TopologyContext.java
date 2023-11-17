@@ -2,9 +2,9 @@
  * Licensed to the Apache Software Foundation (ASF) under one or more contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The ASF licenses this file to you under the Apache License, Version
  * 2.0 (the "License"); you may not use this file except in compliance with the License.  You may obtain a copy of the License at
- *
+ * <p>
  * http://www.apache.org/licenses/LICENSE-2.0
- *
+ * <p>
  * Unless required by applicable law or agreed to in writing, software distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the License for the specific language governing permissions
  * and limitations under the License.
@@ -12,13 +12,28 @@
 
 package org.apache.storm.task;
 
+import com.codahale.metrics.Counter;
+import com.codahale.metrics.Gauge;
+import com.codahale.metrics.Histogram;
+import com.codahale.metrics.Meter;
+import com.codahale.metrics.MetricSet;
 import com.codahale.metrics.Timer;
-import com.codahale.metrics.*;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.concurrent.atomic.AtomicBoolean;
 import org.apache.storm.generated.GlobalStreamId;
 import org.apache.storm.generated.Grouping;
 import org.apache.storm.generated.StormTopology;
 import org.apache.storm.hooks.ITaskHook;
-import org.apache.storm.metric.api.*;
+import org.apache.storm.metric.api.CombinedMetric;
+import org.apache.storm.metric.api.ICombiner;
+import org.apache.storm.metric.api.IMetric;
+import org.apache.storm.metric.api.IReducer;
+import org.apache.storm.metric.api.ReducedMetric;
 import org.apache.storm.metrics2.StormMetricRegistry;
 import org.apache.storm.shade.net.minidev.json.JSONValue;
 import org.apache.storm.shade.org.apache.commons.lang.NotImplementedException;
@@ -27,8 +42,6 @@ import org.apache.storm.tuple.Fields;
 import org.apache.storm.utils.Graph;
 import org.apache.storm.utils.Utils;
 
-import java.util.*;
-import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
  * A `TopologyContext` is given to bolts and spouts in their `prepare()` and `open()` methods, respectively. This object provides
@@ -47,7 +60,7 @@ public class TopologyContext extends WorkerTopologyContext implements IMetricsCo
     private final StormMetricRegistry metricRegistry;
     // This is updated by the Worker and the topology has shared access to it
     private final Map<String, Long> blobToLastKnownVersion;
-    private final Graph roadMap_;
+    private final Graph roadMap;
 
     public TopologyContext(StormTopology topology,
                            Map<String, Object> topoConf,
@@ -68,8 +81,8 @@ public class TopologyContext extends WorkerTopologyContext implements IMetricsCo
                            AtomicBoolean openOrPrepareWasCalled,
                            StormMetricRegistry metricRegistry) {
         super(topology, topoConf, taskToComponent, componentToSortedTasks,
-                componentToStreamToFields, stormId, codeDir, pidDir,
-                workerPort, workerTasks, defaultResources, userResources);
+            componentToStreamToFields, stormId, codeDir, pidDir,
+            workerPort, workerTasks, defaultResources, userResources);
         this.metricRegistry = metricRegistry;
         this.taskId = taskId;
         this.executorData = executorData;
@@ -77,7 +90,7 @@ public class TopologyContext extends WorkerTopologyContext implements IMetricsCo
         this.openOrPrepareWasCalled = openOrPrepareWasCalled;
         blobToLastKnownVersion = blobToLastKnownVersionShared;
         // TODO: load road map from file.
-        roadMap_ = null;
+        roadMap = null;
     }
 
     @SuppressWarnings("checkstyle:AbbreviationAsWordInName")
@@ -90,8 +103,8 @@ public class TopologyContext extends WorkerTopologyContext implements IMetricsCo
         return groupingMap;
     }
 
-    public Graph getRoadMap_() {
-        return roadMap_;
+    public Graph getRoadMap() {
+        return roadMap;
     }
 
     /**
@@ -157,8 +170,9 @@ public class TopologyContext extends WorkerTopologyContext implements IMetricsCo
 
     /**
      * Get component id.
+     *
      * @return the component id for this task. The component id maps to a component id specified for a Spout or Bolt in the topology
-     *     definition.
+     * definition.
      */
     public String getThisComponentId() {
         return getComponentId(taskId);
@@ -247,8 +261,8 @@ public class TopologyContext extends WorkerTopologyContext implements IMetricsCo
     /**
      * Sets the task-level data for the given name. This data is shared amongst the task and its corresponding task hooks.
      *
-     * @param name  name of the task-level data to be set
-     * @param data  task-level data
+     * @param name name of the task-level data to be set
+     * @param data task-level data
      */
     public void setTaskData(String name, Object data) {
         taskData.put(name, data);
@@ -257,7 +271,7 @@ public class TopologyContext extends WorkerTopologyContext implements IMetricsCo
     /**
      * Fetches the task-level data for the given name. This data is shared amongst the task and its corresponding task hooks.
      *
-     * @param name  name of the task-level data to be fetched
+     * @param name name of the task-level data to be fetched
      * @return Associated task-level data
      */
     public Object getTaskData(String name) {
@@ -268,8 +282,8 @@ public class TopologyContext extends WorkerTopologyContext implements IMetricsCo
      * Sets the executor-level data for the given name. This data is shared amongst tasks and corresponding task hooks managed by the
      * given executor.
      *
-     * @param name  name of the executor-level data to be set
-     * @param data  executor-level data
+     * @param name name of the executor-level data to be set
+     * @param data executor-level data
      */
     public void setExecutorData(String name, Object data) {
         executorData.put(name, data);
@@ -279,7 +293,7 @@ public class TopologyContext extends WorkerTopologyContext implements IMetricsCo
      * Fetches the executor-level data for the given name. This data is shared across tasks and corresponding task hook managed by the
      * given executor.
      *
-     * @param name  name of the executor-level data to be fetched
+     * @param name name of the executor-level data to be fetched
      * @return Associated executor-level data
      */
     public Object getExecutorData(String name) {
@@ -345,7 +359,7 @@ public class TopologyContext extends WorkerTopologyContext implements IMetricsCo
     public <T extends IMetric> T registerMetric(String name, T metric, int timeBucketSizeInSecs) {
         if (openOrPrepareWasCalled.get()) {
             throw new RuntimeException("TopologyContext.registerMetric can only be called from within overridden "
-                    + "IBolt::prepare() or ISpout::open() method.");
+                + "IBolt::prepare() or ISpout::open() method.");
         }
 
         if (metric == null) {
@@ -354,7 +368,7 @@ public class TopologyContext extends WorkerTopologyContext implements IMetricsCo
 
         if (timeBucketSizeInSecs <= 0) {
             throw new IllegalArgumentException("TopologyContext.registerMetric can only be called with "
-                    + "timeBucketSizeInSecs greater than or equal to 1 second.");
+                + "timeBucketSizeInSecs greater than or equal to 1 second.");
         }
 
         if (getRegisteredMetricByName(name) != null) {

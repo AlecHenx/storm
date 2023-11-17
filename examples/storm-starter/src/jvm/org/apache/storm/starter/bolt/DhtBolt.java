@@ -1,4 +1,5 @@
 package org.apache.storm.starter.bolt;
+
 import java.util.HashMap;
 import java.util.Map;
 
@@ -10,13 +11,12 @@ import org.apache.storm.tuple.Fields;
 import org.apache.storm.tuple.Tuple;
 import org.apache.storm.tuple.Values;
 
-
-public class DHTBolt extends BaseBasicBolt {
-    public class DHTNode {
+public class DhtBolt extends BaseBasicBolt {
+    public class DhtNode {
         private String id;
         private Map<String, String> keyValueStore;
 
-        public DHTNode(String id) {
+        public DhtNode(String id) {
             this.id = id;
             this.keyValueStore = new HashMap<>();
         }
@@ -29,9 +29,10 @@ public class DHTBolt extends BaseBasicBolt {
             return keyValueStore.get(key);
         }
 
-    // Other necessary methods and properties
+        // Other necessary methods and properties
     }
-    private Map<String, DHTNode> nodes;
+
+    private Map<String, DhtNode> nodes;
 
     @Override
     public void prepare(Map stormConf, TopologyContext context) {
@@ -43,11 +44,11 @@ public class DHTBolt extends BaseBasicBolt {
         String key = input.getStringByField("key");
         String value = input.getStringByField("value");
 
-        // Implement DHT algorithm logic here
+        // Implement Dht algorithm logic here
         // For example, route the key-value pair to the correct node
         String nodeId = "";
         // Store the key-value pair in the node's keyValueStore
-        DHTNode node = nodes.get(nodeId);
+        DhtNode node = nodes.get(nodeId);
         node.put(key, value);
 
         // Emit the result to downstream bolts if necessary
