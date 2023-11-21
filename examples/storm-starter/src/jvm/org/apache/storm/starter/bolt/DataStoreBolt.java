@@ -3,6 +3,8 @@ package org.apache.storm.starter.bolt;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.io.PrintWriter;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.Map;
 import org.apache.storm.task.TopologyContext;
 import org.apache.storm.topology.BasicOutputCollector;
@@ -10,8 +12,8 @@ import org.apache.storm.topology.OutputFieldsDeclarer;
 import org.apache.storm.topology.base.BaseBasicBolt;
 import org.apache.storm.tuple.Tuple;
 
-
-public class StoreBolt extends BaseBasicBolt {
+// "trajId", "edgeId", "dist"
+public class DataStoreBolt extends BaseBasicBolt {
     private PrintWriter writer;
     private Map<String, Object> stormConf;
     private TopologyContext context;
@@ -22,7 +24,9 @@ public class StoreBolt extends BaseBasicBolt {
         this.context = context;
         try {
             // Open the file for writing
-            writer = new PrintWriter(new FileWriter("output.txt"));
+            // TODO: 之后直接接上rocksdb
+//            Path tempDirForTest = Files.createTempDirectory("data-output");
+            writer = new PrintWriter(new FileWriter("C:\\Users\\ASUS\\AppData\\Local\\Temp\\storm-data.txt"));
         } catch (IOException e) {
             e.printStackTrace();
         }
@@ -30,12 +34,13 @@ public class StoreBolt extends BaseBasicBolt {
 
     @Override
     public void execute(Tuple input, BasicOutputCollector collector) {
-        this.context.getConf();
-        String key = input.getStringByField("key");
-        String value = input.getStringByField("value");
+        Integer trajId = input.getIntegerByField("trajId");
+        Long edgeId = input.getLongByField("edgeId");
+        Double dist = input.getDoubleByField("dist");
 
-        // Write the key-value pair to the file
-        writer.println(key + ":" + value);
+        // Serialize
+        writer.println(trajId + ":" + edgeId + ":" + dist);
+        writer.flush();
     }
 
     @Override
@@ -47,4 +52,5 @@ public class StoreBolt extends BaseBasicBolt {
         // Close the file when the bolt is being shutdown
         writer.close();
     }
+
 }

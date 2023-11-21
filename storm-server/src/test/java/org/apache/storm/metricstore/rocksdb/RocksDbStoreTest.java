@@ -77,20 +77,26 @@ public class RocksDbStoreTest {
         double sum10 = 0.0;
         double sum60 = 0.0;
         Metric toPopulate = null;
-        for (int i=0; i<20; i++) {
+        for (int i = 0; i < 20; i++) {
             double value = 5 + i;
-            long timestamp = 1L + i*60*1000;
+            long timestamp = 1L + i * 60 * 1000;
             Metric m = new Metric("cpu", timestamp, "myTopologyId123", value,
-                    "componentId1", "executorId1", "hostname1", "streamid1", 7777, AggLevel.AGG_LEVEL_NONE);
+                "componentId1", "executorId1", "hostname1", "streamid1", 7777, AggLevel.AGG_LEVEL_NONE);
             toPopulate = new Metric(m);
             store.insert(m);
-
-            if (timestamp < 60*1000) {
+            // Indicate to test rockdb lsm tree (newer key will override old key
+//            if (i == 0) {
+//                new Metric("cpu", timestamp, "myTopologyId123", value + 10.0,
+//                    "componentId1", "executorId1", "hostname1", "streamid1", 7777, AggLevel.AGG_LEVEL_NONE);
+//                toPopulate = new Metric(m);
+//                store.insert(m);
+//            }
+            if (timestamp < 60 * 1000) {
                 sum0 += value;
                 sum1 += value;
                 sum10 += value;
                 sum60 += value;
-            } else if (timestamp < 600*1000) {
+            } else if (timestamp < 600 * 1000) {
                 sum10 += value;
                 sum60 += value;
             } else {
@@ -125,7 +131,7 @@ public class RocksDbStoreTest {
         res = store.populateValue(toPopulate);
         assertTrue(res);
         assertEquals(sum10, toPopulate.getSum(), 0.001);
-        assertEquals(sum10/10.0, toPopulate.getValue(), 0.001);
+        assertEquals(sum10 / 10.0, toPopulate.getValue(), 0.001);
         assertEquals(5.0, toPopulate.getMin(), 0.001);
         assertEquals(14.0, toPopulate.getMax(), 0.001);
         assertEquals(10, toPopulate.getCount());
@@ -135,7 +141,7 @@ public class RocksDbStoreTest {
         res = store.populateValue(toPopulate);
         assertTrue(res);
         assertEquals(sum60, toPopulate.getSum(), 0.001);
-        assertEquals(sum60/20.0, toPopulate.getValue(), 0.001);
+        assertEquals(sum60 / 20.0, toPopulate.getValue(), 0.001);
         assertEquals(5.0, toPopulate.getMin(), 0.001);
         assertEquals(24.0, toPopulate.getMax(), 0.001);
         assertEquals(20, toPopulate.getCount());
@@ -144,7 +150,7 @@ public class RocksDbStoreTest {
     @Test
     public void testPopulateFailure() throws Exception {
         Metric m = new Metric("cpu", 3000L, "myTopologyId456", 1.0,
-                "componentId2", "executorId2", "hostname2", "streamid2", 7778, AggLevel.AGG_LEVEL_NONE);
+            "componentId2", "executorId2", "hostname2", "streamid2", 7778, AggLevel.AGG_LEVEL_NONE);
         store.insert(m);
         waitForInsertFinish(m);
         Metric toFind = new Metric(m);
@@ -165,13 +171,13 @@ public class RocksDbStoreTest {
         List<Metric> list;
 
         Metric m1 = new Metric("metricType1", 50000000L, "Topo-m1", 1.0,
-                "component-1", "executor-2", "hostname-1", "stream-1", 1, AggLevel.AGG_LEVEL_NONE);
+            "component-1", "executor-2", "hostname-1", "stream-1", 1, AggLevel.AGG_LEVEL_NONE);
         Metric m2 = new Metric("metricType2", 50030000L, "Topo-m1", 1.0,
-                "component-1", "executor-1", "hostname-2", "stream-2", 1, AggLevel.AGG_LEVEL_NONE);
+            "component-1", "executor-1", "hostname-2", "stream-2", 1, AggLevel.AGG_LEVEL_NONE);
         Metric m3 = new Metric("metricType3", 50200000L, "Topo-m1", 1.0,
-                "component-2", "executor-1", "hostname-1", "stream-3", 1, AggLevel.AGG_LEVEL_NONE);
+            "component-2", "executor-1", "hostname-1", "stream-3", 1, AggLevel.AGG_LEVEL_NONE);
         Metric m4 = new Metric("metricType4", 50200000L, "Topo-m2", 1.0,
-                "component-2", "executor-1", "hostname-2", "stream-4", 2, AggLevel.AGG_LEVEL_NONE);
+            "component-2", "executor-1", "hostname-2", "stream-4", 2, AggLevel.AGG_LEVEL_NONE);
         store.insert(m1);
         store.insert(m2);
         store.insert(m3);
@@ -291,9 +297,9 @@ public class RocksDbStoreTest {
         String commonStreamId = "stream-cleanup-5";
         String defaultS = "default";
         Metric m1 = new Metric(defaultS, 40000000L, commonTopologyId, 1.0,
-                "component-1", defaultS, "hostname-1", commonStreamId, 1, AggLevel.AGG_LEVEL_NONE);
+            "component-1", defaultS, "hostname-1", commonStreamId, 1, AggLevel.AGG_LEVEL_NONE);
         Metric m2 = new Metric(defaultS, System.currentTimeMillis(), commonTopologyId, 1.0,
-                "component-1", "executor-1", defaultS, commonStreamId, 1, AggLevel.AGG_LEVEL_NONE);
+            "component-1", "executor-1", defaultS, commonStreamId, 1, AggLevel.AGG_LEVEL_NONE);
 
         store.insert(m1);
         store.insert(m2);
@@ -306,7 +312,7 @@ public class RocksDbStoreTest {
         assertTrue(list.size() >= 2);
 
         // delete anything older than an hour
-        MetricsCleaner cleaner = new MetricsCleaner((RocksDbStore)store, 1, 1, null, new StormMetricsRegistry());
+        MetricsCleaner cleaner = new MetricsCleaner((RocksDbStore) store, 1, 1, null, new StormMetricsRegistry());
         cleaner.purgeMetrics();
         list = getMetricsFromScan(filter);
         assertEquals(1, list.size());

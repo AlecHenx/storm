@@ -18,6 +18,8 @@ package org.apache.storm.starter;
 import java.util.Map;
 import org.apache.storm.Config;
 import org.apache.storm.LocalCluster;
+import org.apache.storm.starter.bolt.DataStoreBolt;
+import org.apache.storm.starter.bolt.MapMatchBolt;
 import org.apache.storm.starter.bolt.WordCountBolt;
 import org.apache.storm.starter.spout.RandomSentenceSpout;
 import org.apache.storm.starter.spout.RandomTrajectorySpout;
@@ -31,35 +33,19 @@ import org.apache.storm.tuple.Fields;
 /**
  * This topology demonstrates Storm's stream groupings and multilang capabilities.
  */
-public class WordCountTopology {
+public class TrajectoryUploadTopology {
 
     public static void main(String[] args) throws Exception {
         TopologyBuilder builder = new TopologyBuilder();
-        builder.setSpout("spout", new RandomTrajectorySpout(), 5);
-        builder.setBolt("split", new SplitSentence(), 8).shuffleGrouping("spout");
-        builder.setBolt("count", new WordCountBolt(), 12).fieldsGrouping("split", new Fields("word"));
+        builder.setSpout("spout", new RandomTrajectorySpout(), 1);
+        builder.setBolt("mapmatch", new MapMatchBolt(), 2).fieldsGrouping("spout", new Fields("trajId"));
+        builder.setBolt("dataStore", new DataStoreBolt(), 1).fieldsGrouping("mapmatch", new Fields("trajId"));
 
         Config config = new Config();
         config.setDebug(false);
 
         LocalCluster localCluster = new LocalCluster();
-        localCluster.submitTopology("wordcount", config, builder.createTopology());
+        localCluster.submitTopology("trajectoryUpload", config, builder.createTopology());
     }
 
-    public static class SplitSentence extends ShellBolt implements IRichBolt {
-
-        public SplitSentence() {
-            super("E:\\miniconda3\\envs\\online_compression\\python", "splitsentence.py");
-        }
-
-        @Override
-        public void declareOutputFields(OutputFieldsDeclarer declarer) {
-            declarer.declare(new Fields("word"));
-        }
-
-        @Override
-        public Map<String, Object> getComponentConfiguration() {
-            return null;
-        }
-    }
 }
