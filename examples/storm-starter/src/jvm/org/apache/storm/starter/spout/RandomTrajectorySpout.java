@@ -36,6 +36,7 @@ public class RandomTrajectorySpout extends BaseRichSpout {
     SpoutOutputCollector collector;
     Integer pointer = -1;
     Integer m = 1;
+    Integer trajIdPointer = 0;
 
     private static Date seconds(int seconds) {
         Calendar c = new GregorianCalendar(2014, 1, 1);
@@ -56,17 +57,14 @@ public class RandomTrajectorySpout extends BaseRichSpout {
         GpsMeasurement gps3 = new GpsMeasurement(seconds(2), 30, 40);
         GpsMeasurement gps4 = new GpsMeasurement(seconds(3), 10, 70);
         List<GpsMeasurement> gpsMeasurements = Arrays.asList(gps1, gps2, gps3, gps4);
-        if (pointer == 0) {
-            m = 1;
-        } else if (pointer == gpsMeasurements.size() - 1) {
-            m = 1;
-        }
-        pointer = (pointer + m) % gpsMeasurements.size();
-        final GpsMeasurement point = gpsMeasurements.get(pointer);
 
-        LOG.info("Emitting tuple: {}", point);
+        pointer++;
+        final GpsMeasurement point = gpsMeasurements.get(pointer % gpsMeasurements.size());
 
-        collector.emit(new Values(0, pointer, point.position.x, point.position.y));
+        LOG.info("Emitting tuple: {}-{}", pointer / gpsMeasurements.size(), point);
+
+        collector.emit(new Values(pointer / gpsMeasurements.size(), pointer % gpsMeasurements.size(),
+            point.position.x, point.position.y));
     }
 
     @Override

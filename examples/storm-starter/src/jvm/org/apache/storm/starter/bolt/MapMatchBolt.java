@@ -30,13 +30,23 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 public class MapMatchBolt extends BaseBasicBolt {
+    class MapMatchState {
+        public TimeStep<RoadPosition, GpsMeasurement, RoadPath> prevTimeStep = null;
+        public ViterbiAlgorithm<RoadPosition, GpsMeasurement, RoadPath> viterbi = null;
+        public HmmProbabilities hmmProbabilities = null;
+
+        public MapMatchState() {
+            hmmProbabilities = new HmmProbabilities();
+            viterbi = new ViterbiAlgorithm<>();
+        }
+    }
+
     private static final Logger LOG = LoggerFactory.getLogger(MapMatchBolt.class);
     private Integer bufferSize = 10;
     // Buffer
     private List<GpsMeasurement> gpsMeasurements;
-    private TimeStep<RoadPosition, GpsMeasurement, RoadPath> prevTimeStep = null;
-    ViterbiAlgorithm<RoadPosition, GpsMeasurement, RoadPath> viterbi = null;
-    private HmmProbabilities hmmProbabilities = null;
+    private Map<Integer, MapMatchState> states;
+
     private static Map<Integer, Collection<RoadPosition>> candidateMap = null;
     private static Map<Transition<RoadPosition>, Double> routeLengths = null;
 
@@ -53,10 +63,9 @@ public class MapMatchBolt extends BaseBasicBolt {
     @Override
     public void prepare(Map<String, Object> topoConf, TopologyContext context) {
         super.prepare(topoConf, context);
-        hmmProbabilities = new HmmProbabilities();
         candidateMap = new HashMap<>();
         routeLengths = new HashMap<>();
-        viterbi = new ViterbiAlgorithm<>();
+        states = new HashMap<>();
         rp11 = new RoadPosition(1, 1.0 / 5.0, 20.0, 10.0);
         rp12 = new RoadPosition(2, 1.0 / 5.0, 60.0, 10.0);
         rp21 = new RoadPosition(1, 2.0 / 5.0, 20.0, 20.0);
@@ -67,10 +76,10 @@ public class MapMatchBolt extends BaseBasicBolt {
         rp41 = new RoadPosition(4, 2.0 / 3.0, 20.0, 70.0);
         rp42 = new RoadPosition(5, 2.0 / 3.0, 60.0, 70.0);
         // Fake gps
-        GpsMeasurement gps1 = new GpsMeasurement(seconds(0), 10, 10);
-        GpsMeasurement gps2 = new GpsMeasurement(seconds(1), 30, 20);
-        GpsMeasurement gps3 = new GpsMeasurement(seconds(2), 30, 40);
-        GpsMeasurement gps4 = new GpsMeasurement(seconds(3), 10, 70);
+//        GpsMeasurement gps1 = new GpsMeasurement(seconds(0), 10, 10);
+//        GpsMeasurement gps2 = new GpsMeasurement(seconds(1), 30, 20);
+//        GpsMeasurement gps3 = new GpsMeasurement(seconds(2), 30, 40);
+//        GpsMeasurement gps4 = new GpsMeasurement(seconds(3), 10, 70);
 
         candidateMap.put(0, Arrays.asList(rp11, rp12));
         candidateMap.put(1, Arrays.asList(rp21, rp22));
@@ -99,7 +108,7 @@ public class MapMatchBolt extends BaseBasicBolt {
 
     @Override
     public void declareOutputFields(OutputFieldsDeclarer declarer) {
-        declarer.declare(new Fields("trajId", "edgeId", "dist"));
+        declarer.declare(new Fields("trajId", "timestamp", "edgeId", "dist"));
     }
 
     private static Date seconds(int seconds) {
@@ -131,6 +140,7 @@ public class MapMatchBolt extends BaseBasicBolt {
     }
 
     private void computeEmissionProbabilities(
+        HmmProbabilities hmmProbabilities,
         TimeStep<RoadPosition, GpsMeasurement, RoadPath> timeStep) {
         for (RoadPosition candidate : timeStep.candidates) {
             final double distance =
@@ -141,6 +151,7 @@ public class MapMatchBolt extends BaseBasicBolt {
     }
 
     private void computeTransitionProbabilities(
+        HmmProbabilities hmmProbabilities,
         TimeStep<RoadPosition, GpsMeasurement, RoadPath> prevTimeStep,
         TimeStep<RoadPosition, GpsMeasurement, RoadPath> timeStep) {
         final double linearDistance = computeDistance(prevTimeStep.observation.position,
@@ -172,30 +183,36 @@ public class MapMatchBolt extends BaseBasicBolt {
         GpsMeasurement gps =
             new GpsMeasurement(seconds(input.getIntegerByField("timestamp")), input.getDoubleByField("lat"),
                 input.getDoubleByField("lng"));
-        LOG.info(trajId + " " + gps.toString());
-
+        LOG.info(trajId + " " + gps);
+        MapMatchState state = null;
+        if (!states.containsKey(trajId)) {
+            state = new MapMatchState();
+            states.put(trajId, state);
+        } else {
+            state = states.get(trajId);
+        }
         final Collection<RoadPosition> candidates = computeCandidates(input.getIntegerByField("timestamp"));
         final TimeStep<RoadPosition, GpsMeasurement, RoadPath> timeStep =
             new TimeStep<>(gps, candidates);
-        computeEmissionProbabilities(timeStep);
-        if (prevTimeStep == null) {
-            viterbi.startWithInitialObservation(timeStep.observation, timeStep.candidates,
+        computeEmissionProbabilities(state.hmmProbabilities, timeStep);
+        if (state.prevTimeStep == null) {
+            state.viterbi.startWithInitialObservation(timeStep.observation, timeStep.candidates,
                 timeStep.emissionLogProbabilities);
         } else {
-            computeTransitionProbabilities(prevTimeStep, timeStep);
-            viterbi.nextStep(timeStep.observation, timeStep.candidates,
+            computeTransitionProbabilities(state.hmmProbabilities, state.prevTimeStep, timeStep);
+            state.viterbi.nextStep(timeStep.observation, timeStep.candidates,
                 timeStep.emissionLogProbabilities, timeStep.transitionLogProbabilities,
                 timeStep.roadPaths);
         }
-        if (prevTimeStep == null) {
+        if (state.prevTimeStep == null) {
             LOG.info("prevTimeStep is null");
         } else {
             LOG.info("prevTimeStep is not null");
         }
-        prevTimeStep = timeStep;
-        SequenceState<RoadPosition, GpsMeasurement, RoadPath> roadPosition = viterbi.computeMostLikelySequence().get(0);
+        state.prevTimeStep = timeStep;
+        SequenceState<RoadPosition, GpsMeasurement, RoadPath> roadPosition = state.viterbi.computeMostLikelySequence().get(0);
         // FIXME: dist
-        collector.emit(new Values(trajId, roadPosition.state.edgeId, 0.0));
+        collector.emit(new Values(trajId, seconds(input.getIntegerByField("timestamp")).getTime(), roadPosition.state.edgeId, 0.9));
         LOG.info("success to emit");
     }
 }

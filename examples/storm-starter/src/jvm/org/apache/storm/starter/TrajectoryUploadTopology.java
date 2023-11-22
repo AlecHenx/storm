@@ -19,6 +19,7 @@ import java.util.Map;
 import org.apache.storm.Config;
 import org.apache.storm.LocalCluster;
 import org.apache.storm.starter.bolt.DataStoreBolt;
+import org.apache.storm.starter.bolt.IndexStoreBolt;
 import org.apache.storm.starter.bolt.MapMatchBolt;
 import org.apache.storm.starter.bolt.WordCountBolt;
 import org.apache.storm.starter.spout.RandomSentenceSpout;
@@ -39,6 +40,7 @@ public class TrajectoryUploadTopology {
         TopologyBuilder builder = new TopologyBuilder();
         builder.setSpout("spout", new RandomTrajectorySpout(), 1);
         builder.setBolt("mapmatch", new MapMatchBolt(), 2).fieldsGrouping("spout", new Fields("trajId"));
+        builder.setBolt("indexStore", new IndexStoreBolt(), 1).fieldsGrouping("mapmatch", new Fields("edgeId"));
         builder.setBolt("dataStore", new DataStoreBolt(), 1).fieldsGrouping("mapmatch", new Fields("trajId"));
 
         Config config = new Config();

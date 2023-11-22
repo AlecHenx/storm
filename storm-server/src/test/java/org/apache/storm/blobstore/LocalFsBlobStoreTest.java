@@ -2,9 +2,9 @@
  * Licensed to the Apache Software Foundation (ASF) under one or more contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The ASF licenses this file to you under the Apache License, Version
  * 2.0 (the "License"); you may not use this file except in compliance with the License.  You may obtain a copy of the License at
- *
+ * <p>
  * http://www.apache.org/licenses/LICENSE-2.0
- *
+ * <p>
  * Unless required by applicable law or agreed to in writing, software distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the License for the specific language governing permissions
  * and limitations under the License.
@@ -16,11 +16,14 @@ import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.URI;
+import java.nio.ByteBuffer;
 import java.nio.file.Files;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
@@ -49,97 +52,97 @@ import static org.junit.jupiter.api.Assertions.fail;
 import static org.mockito.Mockito.spy;
 
 public class LocalFsBlobStoreTest {
-  private static final Logger LOG = LoggerFactory.getLogger(LocalFsBlobStoreTest.class);
-  URI base;
-  File baseFile;
-  private static Map<String, Object> conf = new HashMap<>();
-  private InProcessZookeeper zk;
+    private static final Logger LOG = LoggerFactory.getLogger(LocalFsBlobStoreTest.class);
+    URI base;
+    File baseFile;
+    private static Map<String, Object> conf = new HashMap<>();
+    private InProcessZookeeper zk;
 
-  @BeforeEach
-  public void init() {
-    initializeConfigs();
-    baseFile = new File("target/blob-store-test-"+UUID.randomUUID());
-    base = baseFile.toURI();
-    try {
-      zk = new InProcessZookeeper();
-    } catch (Exception e) {
-      throw new RuntimeException(e);
+    @BeforeEach
+    public void init() {
+        initializeConfigs();
+        baseFile = new File("target/blob-store-test-" + UUID.randomUUID());
+        base = baseFile.toURI();
+        try {
+            zk = new InProcessZookeeper();
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
     }
-  }
 
-  @AfterEach
-  public void cleanup() throws IOException {
-    FileUtils.deleteDirectory(baseFile);
-    try {
-      zk.close();
-    } catch (Exception e) {
-      throw new RuntimeException(e);
+    @AfterEach
+    public void cleanup() throws IOException {
+        FileUtils.deleteDirectory(baseFile);
+        try {
+            zk.close();
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
     }
-  }
 
-  // Method which initializes nimbus admin
-  public static void initializeConfigs() {
-    conf.put(Config.NIMBUS_ADMINS,"admin");
-    conf.put(Config.NIMBUS_SUPERVISOR_USERS,"supervisor");
-  }
+    // Method which initializes nimbus admin
+    public static void initializeConfigs() {
+        conf.put(Config.NIMBUS_ADMINS, "admin");
+        conf.put(Config.NIMBUS_SUPERVISOR_USERS, "supervisor");
+    }
 
-  private LocalFsBlobStore initLocalFs() {
-    LocalFsBlobStore store = new LocalFsBlobStore();
-    // Spy object that tries to mock the real object store
-    LocalFsBlobStore spy = spy(store);
-    Mockito.doNothing().when(spy).checkForBlobUpdate("test");
-    Mockito.doNothing().when(spy).checkForBlobUpdate("other");
-    Mockito.doNothing().when(spy).checkForBlobUpdate("test-empty-subject-WE");
-    Mockito.doNothing().when(spy).checkForBlobUpdate("test-empty-subject-DEF");
-    Mockito.doNothing().when(spy).checkForBlobUpdate("test-empty-acls");
-    Map<String, Object> conf = Utils.readStormConfig();
-    conf.put(Config.STORM_ZOOKEEPER_PORT, zk.getPort());
-    conf.put(Config.STORM_LOCAL_DIR, baseFile.getAbsolutePath());
-    conf.put(Config.STORM_PRINCIPAL_TO_LOCAL_PLUGIN,"org.apache.storm.security.auth.DefaultPrincipalToLocal");
-    NimbusInfo nimbusInfo = new NimbusInfo("localhost", 0, false);
-    spy.prepare(conf, null, nimbusInfo, null);
-    return spy;
-  }
+    private LocalFsBlobStore initLocalFs() {
+        LocalFsBlobStore store = new LocalFsBlobStore();
+        // Spy object that tries to mock the real object store
+        LocalFsBlobStore spy = spy(store);
+        Mockito.doNothing().when(spy).checkForBlobUpdate("test");
+        Mockito.doNothing().when(spy).checkForBlobUpdate("other");
+        Mockito.doNothing().when(spy).checkForBlobUpdate("test-empty-subject-WE");
+        Mockito.doNothing().when(spy).checkForBlobUpdate("test-empty-subject-DEF");
+        Mockito.doNothing().when(spy).checkForBlobUpdate("test-empty-acls");
+        Map<String, Object> conf = Utils.readStormConfig();
+        conf.put(Config.STORM_ZOOKEEPER_PORT, zk.getPort());
+        conf.put(Config.STORM_LOCAL_DIR, baseFile.getAbsolutePath());
+        conf.put(Config.STORM_PRINCIPAL_TO_LOCAL_PLUGIN, "org.apache.storm.security.auth.DefaultPrincipalToLocal");
+        NimbusInfo nimbusInfo = new NimbusInfo("localhost", 0, false);
+        spy.prepare(conf, null, nimbusInfo, null);
+        return spy;
+    }
 
-  @Test
-  public void testLocalFsWithAuth() throws Exception {
-    testWithAuthentication(initLocalFs());
-  }
+    @Test
+    public void testLocalFsWithAuth() throws Exception {
+        testWithAuthentication(initLocalFs());
+    }
 
-  @Test
-  public void testBasicLocalFs() throws Exception {
-    testBasic(initLocalFs());
-  }
+    @Test
+    public void testBasicLocalFs() throws Exception {
+        testBasic(initLocalFs());
+    }
 
-  @Test
-  public void testMultipleLocalFs() throws Exception {
-    testMultiple(initLocalFs());
-  }
+    @Test
+    public void testMultipleLocalFs() throws Exception {
+        testMultiple(initLocalFs());
+    }
 
-  @Test
-  public void testDeleteAfterFailedCreate() throws Exception{
-    //Check that a blob can be deleted when a temporary file exists in the blob directory
-    LocalFsBlobStore store = initLocalFs();
+    @Test
+    public void testDeleteAfterFailedCreate() throws Exception {
+        //Check that a blob can be deleted when a temporary file exists in the blob directory
+        LocalFsBlobStore store = initLocalFs();
 
-    String key = "test";
-    SettableBlobMeta metadata = new SettableBlobMeta(BlobStoreAclHandler
+        String key = "test";
+        SettableBlobMeta metadata = new SettableBlobMeta(BlobStoreAclHandler
             .WORLD_EVERYTHING);
-    try (AtomicOutputStream out = store.createBlob(key, metadata, null)) {
-        out.write(1);
-        File blobDir = store.getKeyDataDir(key);
-        Files.createFile(blobDir.toPath().resolve("tempFile.tmp"));
+        try (AtomicOutputStream out = store.createBlob(key, metadata, null)) {
+            out.write(1);
+            File blobDir = store.getKeyDataDir(key);
+            Files.createFile(blobDir.toPath().resolve("tempFile.tmp"));
+        }
+
+        store.deleteBlob("test", null);
+
     }
 
-    store.deleteBlob("test",null);
-
-  }
-
-  public Subject getSubject(String name) {
-    Subject subject = new Subject();
-    SingleUserPrincipal user = new SingleUserPrincipal(name);
-    subject.getPrincipals().add(user);
-    return subject;
-  }
+    public Subject getSubject(String name) {
+        Subject subject = new Subject();
+        SingleUserPrincipal user = new SingleUserPrincipal(name);
+        subject.getPrincipals().add(user);
+        return subject;
+    }
 
     // Gets Nimbus Subject with NimbusPrincipal set on it
     public static Subject getNimbusSubject() {
@@ -313,14 +316,28 @@ public class LocalFsBlobStoreTest {
         // Tests for case when subject == null (security turned off) and
         // acls for the blob are set to WORLD_EVERYTHING
         SettableBlobMeta metadata = new SettableBlobMeta(BlobStoreAclHandler
-                                                             .WORLD_EVERYTHING);
+            .WORLD_EVERYTHING);
+        byte[] key = new byte[16];
+        ByteBuffer values = ByteBuffer.wrap(key);
+        values.putInt(1);
+        values.putInt(2);
+        values.putInt(54);
         try (AtomicOutputStream out = store.createBlob("test", metadata, null)) {
-            out.write(1);
+            out.write(key);
         }
         assertStoreHasExactly(store, "test");
         // Testing whether acls are set to WORLD_EVERYTHING
         assertTrue(metadata.toString().contains("AccessControl(type:OTHER, access:7)"), "ACL does not contain WORLD_EVERYTHING");
-        readAssertEquals(store, "test", 1);
+//        readAssertEquals(store, "test", 1);
+        byte[] outKey = new byte[16];
+        int res;
+        try (InputStream in = store.getBlob("test", null)) {
+            res = in.read(outKey);
+        }
+        LOG.info("res: {}", res);
+        assertEquals(ByteBuffer.wrap(outKey, 0, 4).getInt(), 1);
+        assertEquals(ByteBuffer.wrap(outKey, 4, 4).getInt(), 2);
+        assertEquals(ByteBuffer.wrap(outKey, 8, 4).getInt(), 54);
 
         LOG.info("Deleting test");
         store.deleteBlob("test", null);
@@ -385,7 +402,7 @@ public class LocalFsBlobStoreTest {
         assertStoreHasExactly(store);
         LOG.info("Creating test");
         try (AtomicOutputStream out = store.createBlob("test", new SettableBlobMeta(BlobStoreAclHandler
-                                                                                        .WORLD_EVERYTHING), null)) {
+            .WORLD_EVERYTHING), null)) {
             out.write(1);
         }
         assertStoreHasExactly(store, "test");
@@ -393,7 +410,7 @@ public class LocalFsBlobStoreTest {
 
         LOG.info("Creating other");
         try (AtomicOutputStream out = store.createBlob("other", new SettableBlobMeta(BlobStoreAclHandler.WORLD_EVERYTHING),
-                                                       null)) {
+            null)) {
             out.write(2);
         }
         assertStoreHasExactly(store, "test", "other");
@@ -415,7 +432,7 @@ public class LocalFsBlobStoreTest {
 
         LOG.info("Creating test again");
         try (AtomicOutputStream out = store.createBlob("test", new SettableBlobMeta(BlobStoreAclHandler.WORLD_EVERYTHING),
-                                                       null)) {
+            null)) {
             out.write(2);
         }
         assertStoreHasExactly(store, "test", "other");
@@ -464,7 +481,7 @@ public class LocalFsBlobStoreTest {
         throws AuthorizationException, KeyNotFoundException, KeyAlreadyExistsException, IOException {
         LocalFsBlobStore store = initLocalFs();
         try (AtomicOutputStream out = store.createBlob("test", new SettableBlobMeta(BlobStoreAclHandler
-                                                                                        .WORLD_EVERYTHING), null)) {
+            .WORLD_EVERYTHING), null)) {
             out.write(1);
         }
         try (InputStreamWithMeta blobInputStream = store.getBlob("test", null)) {
