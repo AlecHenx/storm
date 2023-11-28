@@ -2,42 +2,37 @@ package org.apache.storm.starter.bolt;
 
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.PrintWriter;
 import java.nio.ByteBuffer;
-import java.nio.file.Path;
-import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import org.agrona.collections.LongArrayList;
 import org.apache.storm.Config;
-import org.apache.storm.DaemonConfig;
 import org.apache.storm.blobstore.AtomicOutputStream;
-import org.apache.storm.blobstore.BlobStoreAclHandler;
 import org.apache.storm.blobstore.LocalFsBlobStore;
 import org.apache.storm.generated.AuthorizationException;
 import org.apache.storm.generated.KeyAlreadyExistsException;
 import org.apache.storm.generated.KeyNotFoundException;
-import org.apache.storm.generated.SettableBlobMeta;
 import org.apache.storm.nimbus.NimbusInfo;
 import org.apache.storm.task.TopologyContext;
 import org.apache.storm.topology.BasicOutputCollector;
 import org.apache.storm.topology.OutputFieldsDeclarer;
 import org.apache.storm.topology.base.BaseBasicBolt;
-import org.apache.storm.trajstore.TrajPoint;
-import org.apache.storm.trajstore.TrajStore;
-import org.apache.storm.trajstore.TrajStoreConfig;
-import org.apache.storm.trajstore.TrajStoreException;
-import org.apache.storm.trajstore.rocksdb.StringMetadataCache;
 import org.apache.storm.tuple.Fields;
 import org.apache.storm.tuple.Tuple;
 import org.apache.storm.tuple.Values;
 import org.apache.storm.utils.Utils;
+import org.datanucleus.store.types.wrappers.ArrayList;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-// "trajId", "edgeId", "dist"
-public class IndexStoreBolt extends BaseBasicBolt {
+/**
+ * @author alecHe
+ * @desc ...
+ * @date 2023-11-28 10:57:52
+ */
+public class SpacialQueryBolt extends BaseBasicBolt {
     private static final Logger LOG = LoggerFactory.getLogger(IndexStoreBolt.class);
     private Map<String, Object> stormConf;
     private TopologyContext context;
@@ -73,30 +68,8 @@ public class IndexStoreBolt extends BaseBasicBolt {
         return sets;
     }
 
-    byte[] serialize(Set<Integer> sets) {
-        byte[] p = new byte[(sets.size() + 1) * 4];
-        ByteBuffer values = ByteBuffer.wrap(p);
-        values.putInt(sets.size());
-        for (Integer v : sets) {
-            values.putInt(v);
-        }
-        return p;
-    }
-
-    private void insert(Integer trajId, Long edgeId) throws AuthorizationException, KeyAlreadyExistsException {
-        SettableBlobMeta metadata = new SettableBlobMeta(BlobStoreAclHandler
-            .WORLD_EVERYTHING);
-        try (AtomicOutputStream outputStream = store.createBlob(edgeId.toString(), metadata, null)) {
-            Set<Integer> sets = new HashSet<>();
-            sets.add(trajId);
-            outputStream.write(serialize(sets));
-        } catch (IOException ex) {
-            throw new RuntimeException(ex);
-        }
-    }
-
-    private void upsert(Integer trajId, Long edgeId)
-        throws IOException, AuthorizationException, KeyAlreadyExistsException, KeyNotFoundException {
+    private Set<Integer> lookup(Long edgeId)
+        throws IOException, AuthorizationException {
         // 1. read
         byte[] out = new byte[MAX_TRAJID_NUM * 4];
         Set<Integer> old = null;
@@ -104,41 +77,38 @@ public class IndexStoreBolt extends BaseBasicBolt {
             in.read(out);
             // 4.update
             old = deserialize(out);
-            old.add(trajId);
             // 2. check
         } catch (KeyNotFoundException e) {
             // No this key, insert case.
-            LOG.info("edgeId {}, create {}", edgeId, trajId);
-            // 3. write
-            insert(trajId, edgeId);
+            LOG.info("No this key {}", edgeId);
         }
-        if (old != null) {
-            if (old.isEmpty()) {
-                LOG.info("edgeId {}, create {}, old set size {}", edgeId, trajId, old.size());
-                insert(trajId, edgeId);
-            } else {
-                LOG.info("edgeId {}, update {}, old set size {}", edgeId, trajId, old.size());
-                try (AtomicOutputStream outputStream = store.updateBlob(edgeId.toString(), null)) {
-                    outputStream.write(serialize(old));
-                }
-            }
-
-        }
+        return old;
     }
 
     @Override
     public void execute(Tuple tuple, BasicOutputCollector collector) {
-        Long edgeId = tuple.getLongByField("edgeId");
-        Integer trajId = tuple.getIntegerByField("trajId");
-        try {
-            upsert(trajId, edgeId);
-        } catch (Exception e) {
-            e.printStackTrace();
+        if (tuple == null || !tuple.contains("SpacialRange")) {
+            return;
+        }
+        List<Long> edgeIds = (LongArrayList) tuple.getValue(1);
+        Set<Integer> trajs = new HashSet<>();
+        for (Long edgeId : edgeIds) {
+            try {
+                Set<Integer> tmp = lookup(edgeId);
+                trajs.addAll(tmp);
+            } catch (Exception r) {
+                r.printStackTrace();
+            }
+        }
+        for (Integer trajId : trajs) {
+            collector.emit(new Values(trajId,
+                tuple.getLongByField("startTime"), tuple.getLongByField("endTime")));
         }
 
     }
 
     @Override
     public void declareOutputFields(OutputFieldsDeclarer declarer) {
+        declarer.declare(new Fields("trajId", "startTime", "endTime"));
     }
 }

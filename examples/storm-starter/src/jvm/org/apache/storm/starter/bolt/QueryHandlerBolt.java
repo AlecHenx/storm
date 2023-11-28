@@ -1,18 +1,19 @@
 package org.apache.storm.starter.bolt;
 
-import java.io.FileWriter;
-import java.io.IOException;
 import java.io.PrintWriter;
-import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import org.apache.storm.DaemonConfig;
-import org.apache.storm.metricstore.rocksdb.RocksDbStore;
 import org.apache.storm.task.TopologyContext;
 import org.apache.storm.topology.BasicOutputCollector;
 import org.apache.storm.topology.OutputFieldsDeclarer;
 import org.apache.storm.topology.base.BaseBasicBolt;
+import org.apache.storm.trajstore.FilterOptions;
 import org.apache.storm.trajstore.TrajPoint;
 import org.apache.storm.trajstore.TrajStore;
 import org.apache.storm.trajstore.TrajStoreConfig;
@@ -22,8 +23,13 @@ import org.apache.storm.tuple.Tuple;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-// "trajId", "edgeId", "dist"
-public class DataStoreBolt extends BaseBasicBolt {
+/**
+ * @author alecHe
+ * @desc ...
+ * @date 2023-11-22 15:59:05
+ */
+public class QueryHandlerBolt extends BaseBasicBolt {
+
     private static final Logger LOG = LoggerFactory.getLogger(DataStoreBolt.class);
     private PrintWriter writer;
     private Map<String, Object> stormConf;
@@ -51,19 +57,42 @@ public class DataStoreBolt extends BaseBasicBolt {
         }
     }
 
+    private List<TrajPoint> getMetricsFromScan(FilterOptions filter) throws TrajStoreException {
+        List<TrajPoint> list = new ArrayList<>();
+        store.scan(filter, list::add);
+        return list;
+    }
+
     @Override
     public void execute(Tuple input, BasicOutputCollector collector) {
         Integer trajId = input.getIntegerByField("trajId");
-        Long timestamp = input.getLongByField("timestamp");
-        Long edgeId = input.getLongByField("edgeId");
-        Double dist = input.getDoubleByField("dist");
+        Long startTime = input.getLongByField("startTime");
+        Long endTime = input.getLongByField("endTime");
+        List<TrajPoint> list;
+        FilterOptions filter = new FilterOptions();
 
-        TrajPoint p = new TrajPoint(trajId, timestamp, edgeId, dist);
+        if (trajId != -1) {
+            filter.setTrajectoryId(trajId);
+        }
+        if (startTime != -1) {
+            filter.setStartTime(startTime);
+        }
+        if (endTime != -1) {
+            filter.setEndTime(endTime);
+        }
+
         try {
-            store.insert(p);
-            LOG.info(p.toString());
+            list = getMetricsFromScan(filter);
         } catch (TrajStoreException e) {
             e.printStackTrace();
+            return;
+        }
+        if (list.isEmpty()) {
+            LOG.info("There is no trajectory {}.", trajId);
+            return;
+        }
+        for (TrajPoint p : list) {
+            LOG.info(p.toString());
         }
 
     }
@@ -79,5 +108,4 @@ public class DataStoreBolt extends BaseBasicBolt {
         }
         StringMetadataCache.cleanUp();
     }
-
 }

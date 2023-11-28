@@ -15,18 +15,11 @@
 
 package org.apache.storm.starter;
 
-import java.util.Map;
 import org.apache.storm.Config;
 import org.apache.storm.LocalCluster;
-import org.apache.storm.starter.bolt.DataStoreBolt;
-import org.apache.storm.starter.bolt.IndexStoreBolt;
-import org.apache.storm.starter.bolt.MapMatchBolt;
-import org.apache.storm.starter.bolt.WordCountBolt;
-import org.apache.storm.starter.spout.RandomSentenceSpout;
-import org.apache.storm.starter.spout.RandomTrajectorySpout;
-import org.apache.storm.task.ShellBolt;
-import org.apache.storm.topology.IRichBolt;
-import org.apache.storm.topology.OutputFieldsDeclarer;
+import org.apache.storm.starter.bolt.QueryHandlerBolt;
+import org.apache.storm.starter.spout.query.IdQuerySpout;
+import org.apache.storm.starter.spout.query.TimeRangeQuerySpout;
 import org.apache.storm.topology.TopologyBuilder;
 import org.apache.storm.tuple.Fields;
 
@@ -34,20 +27,18 @@ import org.apache.storm.tuple.Fields;
 /**
  * This topology demonstrates Storm's stream groupings and multilang capabilities.
  */
-public class TrajectoryUploadTopology {
+public class TrajectoryTimeRangeQueryTopology {
 
     public static void main(String[] args) throws Exception {
         TopologyBuilder builder = new TopologyBuilder();
-        builder.setSpout("spout", new RandomTrajectorySpout(), 1);
-//        builder.setBolt("mapmatch", new MapMatchBolt(), 2).fieldsGrouping("spout", new Fields("trajId"));
-        builder.setBolt("indexStore", new IndexStoreBolt(), 1).fieldsGrouping("spout", new Fields("edgeId"));
-        builder.setBolt("dataStore", new DataStoreBolt(), 1).fieldsGrouping("spout", new Fields("trajId"));
+        builder.setSpout("spout", new TimeRangeQuerySpout(), 1);
+        builder.setBolt("idQuery", new QueryHandlerBolt(), 1).fieldsGrouping("spout", new Fields("trajId"));
 
         Config config = new Config();
         config.setDebug(false);
 
         LocalCluster localCluster = new LocalCluster();
-        localCluster.submitTopology("trajectoryUpload", config, builder.createTopology());
+        localCluster.submitTopology("trajectoryTimeRangeQuery", config, builder.createTopology());
     }
 
 }
